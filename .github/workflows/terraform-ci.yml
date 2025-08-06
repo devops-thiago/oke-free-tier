@@ -1,0 +1,172 @@
+name: Terraform CI
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '**.hcl'
+      - 'go.mod'
+      - 'go.sum'
+      - 'test/**'
+      - '.github/workflows/terraform-ci.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - '**.tf'
+      - '**.tfvars'
+      - '**.hcl'
+      - 'go.mod'
+      - 'go.sum'
+      - 'test/**'
+      - '.github/workflows/terraform-ci.yml'
+
+jobs:
+  terraform-validation:
+    name: Terraform Validation & Testing
+    runs-on: ubuntu-latest
+    environment: dev
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Shallow clones should be disabled for better analysis
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ~1.6
+        terraform_wrapper: false
+
+    - name: Setup Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.21'
+
+    - name: Cache Go modules
+      uses: actions/cache@v3
+      with:
+        path: ~/go/pkg/mod
+        key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+        restore-keys: |
+          ${{ runner.os }}-go-
+
+    - name: Cache Terraform modules
+      uses: actions/cache@v3
+      with:
+        path: |
+          .terraform
+          .terraform.lock.hcl
+        key: ${{ runner.os }}-terraform-${{ hashFiles('**/.terraform.lock.hcl') }}
+        restore-keys: |
+          ${{ runner.os }}-terraform-
+
+    # Terraform Format Check
+    - name: Terraform Format Check
+      run: |
+        echo "🔍 Checking Terraform formatting..."
+        terraform fmt -check -recursive
+        if [ $? -ne 0 ]; then
+          echo "❌ Terraform files are not properly formatted"
+          echo "💡 Run 'terraform fmt -recursive' to fix formatting issues"
+          exit 1
+        fi
+        echo "✅ All Terraform files are properly formatted"
+
+    # Terraform Initialization
+    - name: Terraform Init
+      run: |
+        echo "🚀 Initializing Terraform..."
+        terraform init -backend=false
+        echo "✅ Terraform initialized successfully"
+
+    # Terraform Validation
+    - name: Terraform Validate
+      run: |
+        echo "🔍 Validating Terraform configuration..."
+        terraform validate
+        echo "✅ Terraform configuration is valid"
+
+    # Install TFLint
+    - name: Setup TFLint
+      uses: terraform-linters/setup-tflint@v4
+      with:
+        tflint_version: v0.48.0
+
+    - name: Show TFLint version
+      run: tflint --version
+
+    - name: Init TFLint
+      run: tflint --init
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+    # Terraform Linting
+    - name: Run TFLint
+      run: |
+        echo "🔍 Running Terraform linting..."
+        # Use default format to avoid compact format crash
+        if tflint; then
+          echo "✅ Terraform linting completed successfully"
+        else
+          echo "⚠️ TFLint found issues in the code"
+          echo "Please review and fix the issues above"
+          exit 1
+        fi
+
+    # Security Scanning with Trivy
+    - name: Run Trivy security scan
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'config'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        exit-code: '0'  # Don't fail the build on security issues
+        severity: 'CRITICAL,HIGH,MEDIUM'
+    - name: Upload Trivy scan results to GitHub Security tab
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+
+    # Go Dependencies
+    - name: Download Go Dependencies
+      run: |
+        echo "📦 Downloading Go dependencies..."
+        go mod download
+        echo "✅ Go dependencies downloaded"
+
+    # Run Terratest
+    - name: Run Terratest
+      run: |
+        echo "🧪 Running Terratest..."
+        go test -v ./test/ -timeout 10m
+        echo "✅ All tests passed"
+
+    # SonarCloud Analysis
+    - name: SonarCloud Scan
+      uses: SonarSource/sonarqube-scan-action@master
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+    # Summary
+    - name: Validation Summary
+      run: |
+        echo "🎉 All validation steps completed successfully!"
+        echo ""
+        echo "✅ Terraform Format Check"
+        echo "✅ Terraform Validation"
+        echo "✅ Terraform Linting (TFLint)"
+        echo "✅ Security Scanning (Trivy)"
+        echo "✅ Terratest Execution"
+        echo "✅ SonarCloud Analysis"
+        echo ""
+        echo "🚀 Your Terraform code is ready for merge!"
