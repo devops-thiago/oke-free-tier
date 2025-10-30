@@ -153,6 +153,14 @@ Internet
 
 ### OCI Free Tier Account
 
+> ⚠️ **IMPORTANT: OKE Trial Limitation**
+> Oracle Container Engine for Kubernetes (OKE) is only available during the **first 30 days** after you create a new OCI account as part of the trial period. After 30 days, OKE clusters and NAT Gateways are no longer available in the Always Free tier.
+>
+> **Alternative Options:**
+> - Use this project during your 30-day trial period for learning and testing
+> - Request service limit increases (may require upgrading to paid tier)
+> - Consider self-managed Kubernetes alternatives like k3s on free tier compute instances
+
 If you don't have an OCI account yet, follow these steps to create a free one:
 
 1. **Visit Oracle Cloud**: Go to [cloud.oracle.com](https://cloud.oracle.com)
