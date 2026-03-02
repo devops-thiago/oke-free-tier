@@ -39,7 +39,7 @@ jobs:
         fetch-depth: 0  # Shallow clones should be disabled for better analysis
 
     - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v3
+      uses: hashicorp/setup-terraform@v4
       with:
         terraform_version: ~1.6
         terraform_wrapper: false
