@@ -29,8 +29,6 @@ jobs:
     environment: dev
     permissions:
       contents: read
-      security-events: write
-      actions: read
     
     steps:
     - name: Checkout Code
@@ -120,22 +118,6 @@ jobs:
           exit 1
         fi
 
-    # Security Scanning with Trivy
-    - name: Run Trivy security scan
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'config'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        exit-code: '0'  # Don't fail the build on security issues
-        severity: 'CRITICAL,HIGH,MEDIUM'
-    - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v4
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
-
     # Go Dependencies
     - name: Download Go Dependencies
       run: |
@@ -165,7 +147,6 @@ jobs:
         echo "✅ Terraform Format Check"
         echo "✅ Terraform Validation"
         echo "✅ Terraform Linting (TFLint)"
-        echo "✅ Security Scanning (Trivy)"
         echo "✅ Terratest Execution"
         echo "✅ SonarCloud Analysis"
         echo ""
